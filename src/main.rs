@@ -1,20 +1,44 @@
-#![no_std]
+//! Uses the StatefulOutputPin embedded_hal trait to toggle the pin
+//! On the stm32 discovery board this is the "south" led
+//! Target board: STM32F3DISCOVERY
+
+#![deny(unsafe_code)]
 #![no_main]
+#![no_std]
 
-// pick a panicking behavior
-extern crate panic_halt; // you can put a breakpoint on `rust_begin_unwind` to catch panics
-// extern crate panic_abort; // requires nightly
-// extern crate panic_itm; // logs messages over ITM; requires ITM support
-// extern crate panic_semihosting; // logs messages to the host stderr; requires a debugger
+extern crate panic_halt;
 
-use cortex_m::asm;
+mod leds;
+
 use cortex_m_rt::entry;
+use stm32f3xx_hal::prelude::*;
+use stm32f3xx_hal::stm32;
+use crate::leds::Leds;
+use stm32f3xx_hal::delay::Delay;
 
 #[entry]
 fn main() -> ! {
-    asm::nop(); // To not have main optimize to abort in release mode, remove when you add code
+    let dp = stm32::Peripherals::take().unwrap();
+    let cp = cortex_m::Peripherals::take().unwrap();
+    //dp.RCC.ahbenr.modify(|r, w| w.paen().set_bit().pben().variant(BLAH::Variant1));
+    let mut rcc = dp.RCC.constrain();
+    let mut flash = dp.FLASH.constrain();
+    let mut gpioe = dp.GPIOE.split(&mut rcc.ahb);
+    let clocks = rcc.cfgr.freeze(&mut flash.acr);
+
+    let mut leds = Leds::new(gpioe);
+    let mut delay = Delay::new(cp.SYST, clocks);
 
     loop {
-        // your code goes here
+
+        for i in (0..4)
+            {
+                leds[i].on();
+                leds[i+4].on();
+                delay.delay_ms(500u32);
+                leds[i].off();
+                leds[i+4].off();
+                delay.delay_ms(500u32);
+            }
     }
 }
